@@ -15,23 +15,12 @@ const getShareConfig = async (ctx) => {
     isMobile = window.__NEXT_DATA__.props.isMobile
   }
   ctx.isMobile = isMobile
-  let catalogs_ = null
-  let language_ = null
-  if (Page.getInitialCatalogs) {
-    const {catalogs, language, } = await getInitialI18n(ctx)
-    catalogs_ = catalog
-    language_ = language
-    ctx.catalogs = catalogs
-    ctx.language = language
-  }
 
   const fetchPolicy = req ? 'network-only' : 'cache-first'
   ctx.fetchPolicy = fetchPolicy
 
   return {
     isMobile,
-    catalogs: catalogs_,
-    language: language_,
     fetchPolicy,
   }
 }
@@ -66,14 +55,18 @@ function getOrCreateStore ({initialReducer, initialReduxState}, path) {
 const withAppStore = Page => {
   return class extends React.Component {
     static async getInitialProps(ctx) {            
-      const {catalogs, language, isMobile} = await getShareConfig(ctx)
+      const {isMobile} = await getShareConfig(ctx)
       let reduxStore = null
       let apolloClients = null
       let reduxStorePath = null
       let items = null
+      let catalogs_ = null
+      let language_ = null
 
       if (Page.getInitialConfig) {
-        const {redux, apollo} = await Page.getInitialConfig(ctx)
+        const {redux, apollo, catalogs, language} = await Page.getInitialConfig(ctx)
+        catalogs_ = catalogs
+        language_ = language
         reduxStorePath = redux
 
         if (redux) {
@@ -112,8 +105,8 @@ const withAppStore = Page => {
       }
             
       return { 
-        language,
-        catalogs,
+        language: language_,
+        catalogs: catalogs_,
         initialReduxState: reduxStore ? reduxStore.getState() : null,
         items,
         isMobile,
