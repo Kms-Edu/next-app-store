@@ -4,6 +4,8 @@ import { I18nProvider } from '@lingui/react'
 import initializeStore from './utils/store'
 import initApollo from './utils/init-apollo'
 import MobileDetect from 'mobile-detect'
+import PageContext from './context'
+import Cookies from 'universal-cookie'
 
 const getShareConfig = async (ctx) => {
   const {req} = ctx
@@ -54,7 +56,8 @@ function getOrCreateStore ({initialReducer, initialReduxState}, path) {
 }
 const withAppStore = Page => {
   return class extends React.Component {
-    static async getInitialProps(ctx) {            
+    static async getInitialProps(ctx) {    
+      const {req} = ctx        
       const {isMobile} = await getShareConfig(ctx)
       let reduxStore = null
       let apolloClients = null
@@ -62,15 +65,20 @@ const withAppStore = Page => {
       let items = null
       let catalogs_ = null
       let language_ = null
+      let cookieStr = req ? req.headers.cookie : ''
+      const cookies = req ? new Cookies(cookieStr) : new Cookies()
+      ctx.cookies = cookies
 
       if (Page.getInitialConfig) {
         const {redux, apollo, catalogs, language} = await Page.getInitialConfig(ctx)
         catalogs_ = catalogs
         language_ = language
         reduxStorePath = redux
+        
 
         if (redux) {
           log('starting getInitialStore')
+
           const initialReducer = Page.getInitialStore(ctx)
           reduxStore = getOrCreateStore({initialReducer}, redux)
           ctx.reduxStore = reduxStore
@@ -111,39 +119,60 @@ const withAppStore = Page => {
         items,
         isMobile,
         reduxStorePath,
+        cookieStr,
+      }
+    }
+    constructor(props) {
+      super(props)
+      let ctx = {}
+
+      const {catalogs, language, items, initialReduxState, reduxStorePath, cookieStr} = props
+
+      ctx.cookies =  isServer ? new Cookies(cookieStr) : new Cookies()
+      this.catalogs = catalogs
+      this.language = language
+      this.reduxStore = null
+      this.apolloClients = null
+
+      if (initialReduxState) {
+        const initialReducer = Page.getInitialStore(ctx)
+        this.reduxStore = getOrCreateStore({initialReducer, initialReduxState}, reduxStorePath)
+      }
+
+      if (items) {
+        this.apolloClients = objectMap(items, (key, item) => {
+          return initApollo({name: item.name, graphqlHost: item.graphqlHost, reduxStore: this.reduxStore, apolloState: item.apolloState})
+        })
       }
     }
     render() {
       const props = this.props
-
-      const {catalogs, language, items, initialReduxState, reduxStorePath} = props
-      let reduxStore = null
-      let apolloClients = null
-      
-      if (initialReduxState) {
-        const initialReducer = Page.getInitialStore(props)
-        reduxStore = getOrCreateStore({initialReducer, initialReduxState}, reduxStorePath)
-      }
-
-      if (items) {
-        apolloClients = objectMap(items, (key, item) => {
-          return initApollo({name: item.name, graphqlHost: item.graphqlHost, reduxStore, apolloState: item.apolloState})
-        })
-      }
+      const apolloClients = this.apolloClients
+      const reduxStore = this.reduxStore
+      const catalogs = this.catalogs
+      const language = this.language
 
       if (apolloClients && reduxStore) {
         if (language && catalogs) {
           return (
             <I18nProvider language={language} catalogs={catalogs}>
               <Provider store={reduxStore}>
-                <Page {...props} apolloClients={apolloClients} />
+                <PageContext.Provider value={{
+                  apolloClients
+                }}>
+                  <Page {...props} apolloClients={apolloClients} />
+                </PageContext.Provider>
               </Provider>
             </I18nProvider>
           )
         } else {
           return (
             <Provider store={reduxStore}>
-              <Page {...props} apolloClients={apolloClients} />
+              <PageContext.Provider value={{
+                apolloClients
+              }}>
+                <Page {...props} apolloClients={apolloClients} />
+              </PageContext.Provider>
             </Provider>
           )
         }
@@ -152,7 +181,11 @@ const withAppStore = Page => {
         if (language && catalogs) {
           return (          
             <I18nProvider language={language} catalogs={catalogs}>
-              <Page {...props} apolloClients={apolloClients} />
+              <PageContext.Provider value={{
+                apolloClients
+              }}>
+                <Page {...props} apolloClients={apolloClients} />
+              </PageContext.Provider>
             </I18nProvider>
           )
         } else {
