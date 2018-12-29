@@ -8,6 +8,7 @@ import { onError } from 'apollo-link-error';
 import { getMainDefinition } from 'apollo-utilities'
 import { createSubscriptionClient } from './create-subscription-client'
 import { InMemoryCache } from 'apollo-cache-inmemory'
+import getHeaders from './get-headers'
 
 const isSubscriptionOperation = ({ query }) => {
   const { kind, operation } = getMainDefinition(query);
@@ -31,7 +32,7 @@ if (!process.browser) {
   global.fetch = fetch
 }
 
-function create ({name, graphqlHost, reduxStore, apolloState}) {
+function create ({name, graphqlHost, reduxStore, apolloState, cookies}) {
   const QUERY_URL = `https://${graphqlHost}`
   const SUBSCRIPTION_URL = `wss://${graphqlHost}`
   const MUTATION_URL = QUERY_URL
@@ -40,19 +41,11 @@ function create ({name, graphqlHost, reduxStore, apolloState}) {
 
   let link = createHttpLink({
     uri: QUERY_URL,
-    credentials: 'include',
   })
 
-  const contextLink = setContext(
-    async () => {
-      let headers = {}
-      //const token = localStorage.getItem('token');
-      if (reduxStore && reduxStore.dispatch.auth && typeof(reduxStore.dispatch.auth.getHeaders === 'function')) {
-        headers = await reduxStore.dispatch.auth.getHeaders()  
-      }
-      return {headers}
-    }
-  )
+  const contextLink = setContext(() => {
+    return getHeaders(cookies.get('token'))
+  })
 
   const errorLink = onError(
     ({ graphQLErrors, networkError }) => {
@@ -68,7 +61,6 @@ function create ({name, graphqlHost, reduxStore, apolloState}) {
       }
     }
   )
-  
 
   link = ApolloLink.from([errorLink, contextLink, link])
 
@@ -88,6 +80,7 @@ function create ({name, graphqlHost, reduxStore, apolloState}) {
       createSubscriptionClient({
         wsUrl: SUBSCRIPTION_URL,
         reduxStore,
+        cookies,
       })
     )
     const subscriptionLink = ApolloLink.from([errorLink, wsLinks[name]])
@@ -122,20 +115,23 @@ function create ({name, graphqlHost, reduxStore, apolloState}) {
     cache: new InMemoryCache().restore(apolloState || {}),
     shouldBatch: true,
   })
-  if (process.browser) {
+  if (!ssrMode) {
     client.restartWebsocketConnection = () => {
-      if (wsLinks[name]) {        
-        wsLinks[name].subscriptionClient.connectionParams = async () => {
-          let headers = {}
-          //const token = localStorage.getItem('token');
-          if (reduxStore && reduxStore.dispatch.auth && typeof(reduxStore.dispatch.auth.getHeaders === 'function')) {
-            headers = await reduxStore.dispatch.auth.getHeaders()  
-          }
-          return {headers}
+      try {
+        if (wsLinks[name]) {        
+          wsLinks[name].subscriptionClient.connectionParams = async () => getHeaders(cookies.get('token'))
+          wsLinks[name].subscriptionClient.tryReconnect();
         }
-        wsLinks[name].subscriptionClient.tryReconnect();
+      } catch (err) {
+        reduxStore.dispatch.error.setError(err.message)
       }
-    };    
+    };
+    cookies.addChangeListener( ({name, value}) => {
+      if (name === 'token') {
+        reduxStore.dispatch.auth.tokenSaved(value)
+        client.restartWebsocketConnection()
+      }      
+    })
   }
   return client
 }

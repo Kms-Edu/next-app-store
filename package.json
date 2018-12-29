@@ -1,6 +1,6 @@
 {
   "name": "next-app-store",
-  "version": "1.0.22",
+  "version": "1.0.33",
   "description": "next-app React component",
   "main": "lib/index.js",
   "module": "es/index.js",

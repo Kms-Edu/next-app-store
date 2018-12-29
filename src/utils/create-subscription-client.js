@@ -1,18 +1,15 @@
 import {SubscriptionClient} from 'subscriptions-transport-ws';
+import getHeaders from './get-headers'
+
 export const createSubscriptionClient = ({
   wsUrl,
   reduxStore,
+  cookies,
 }) => {
   const wsClient = new SubscriptionClient(wsUrl, {
     reconnect: true,
     timeout: 30000,
-    connectionParams: async () => {
-      let headers = {}
-      if (reduxStore && reduxStore.dispatch.auth && typeof(reduxStore.dispatch.auth.getHeaders === 'function')) {
-        headers = await reduxStore.dispatch.auth.getHeaders()  
-      }
-      return {headers}
-    }
+    connectionParams: async () => getHeaders(cookies.get('token'))
   });
   
   wsClient.maxConnectTimeGenerator.duration = () => wsClient.maxConnectTimeGenerator.max

@@ -89,7 +89,7 @@ const withAppStore = Page => {
           log('starting getInitialApolloClients')
           apolloClients = objectMap(apollo, (key, value) => {
             return {
-              client: initApollo({name: key, graphqlHost: value, reduxStore, apolloState: null}),
+              client: initApollo({name: key, graphqlHost: value, reduxStore, apolloState: null, cookies}),
               graphqlHost: value,
               name: key,
             }
@@ -141,7 +141,7 @@ const withAppStore = Page => {
 
       if (items) {
         this.apolloClients = objectMap(items, (key, item) => {
-          return initApollo({name: item.name, graphqlHost: item.graphqlHost, reduxStore: this.reduxStore, apolloState: item.apolloState})
+          return initApollo({name: item.name, graphqlHost: item.graphqlHost, reduxStore: this.reduxStore, apolloState: item.apolloState, cookies: ctx.cookies})
         })
       }
     }
