@@ -1,8 +1,9 @@
-const getHeaders = (token) => {
+const getHeaders = (token, role = "user") => {
   let headers = {}
   if (token) {
     headers = {
-      'Authorization': `Bearer ${token}`
+      'Authorization': `Bearer ${token}`,
+      'X-Hasura-Role': role
     }
   }    
   return {headers}

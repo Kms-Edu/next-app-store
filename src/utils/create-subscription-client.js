@@ -9,7 +9,7 @@ export const createSubscriptionClient = ({
   const wsClient = new SubscriptionClient(wsUrl, {
     reconnect: true,
     timeout: 30000,
-    connectionParams: async () => getHeaders(cookies.get('token'))
+    connectionParams: async () => getHeaders(cookies.get('token'), cookies.get('role'))
   });
   
   wsClient.maxConnectTimeGenerator.duration = () => wsClient.maxConnectTimeGenerator.max

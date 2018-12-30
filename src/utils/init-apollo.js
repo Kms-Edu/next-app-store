@@ -44,7 +44,7 @@ function create ({name, graphqlHost, reduxStore, apolloState, cookies}) {
   })
 
   const contextLink = setContext(() => {
-    return getHeaders(cookies.get('token'))
+    return getHeaders(cookies.get('token'), cookies.get('role'))
   })
 
   const errorLink = onError(
@@ -119,7 +119,7 @@ function create ({name, graphqlHost, reduxStore, apolloState, cookies}) {
     client.restartWebsocketConnection = () => {
       try {
         if (wsLinks[name]) {        
-          wsLinks[name].subscriptionClient.connectionParams = async () => getHeaders(cookies.get('token'))
+          wsLinks[name].subscriptionClient.connectionParams = async () => getHeaders(cookies.get('token'), cookies.get('role'))
           wsLinks[name].subscriptionClient.tryReconnect();
         }
       } catch (err) {
@@ -127,8 +127,7 @@ function create ({name, graphqlHost, reduxStore, apolloState, cookies}) {
       }
     };
     cookies.addChangeListener( ({name, value}) => {
-      if (name === 'token') {
-        reduxStore.dispatch.auth.tokenSaved(value)
+      if (name === 'role') {
         client.restartWebsocketConnection()
       }      
     })
